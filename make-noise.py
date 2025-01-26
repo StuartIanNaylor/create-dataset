@@ -10,6 +10,7 @@ import uuid
 import sox
 import configparser as CP
 import math
+import shortuuid
 
 def augment(source_dir, dest_dir, target_qty, target_length, debug, noise_dir, noise_vol, noise_percent):
 
@@ -59,11 +60,11 @@ def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_w
       print("Noise file to short for target length")
     tfm2 = sox.Transformer()
     tfm2.clear_effects()
-    tfm2.norm(-0.1)
     tfm2.trim(offset, target_length + offset)
     tfm2.fade(fade_in_len=0.02, fade_out_len=0.02)
+    tfm2.norm(-0.1)
     out = os.path.splitext(noise_wav)[0] + '-bld-' + str(version) + '.wav'
-    out = dest_dir + "/" + os.path.basename(out)
+    out = dest_dir + "/" + shortuuid.uuid() + "-" + os.path.basename(out)
     tfm2.build_file(noise_wav, out)
     print(out)
     

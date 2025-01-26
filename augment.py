@@ -10,6 +10,7 @@ import uuid
 import sox
 import configparser as CP
 import math
+import shortuuid
 
 def augment(source_dir, dest_dir, target_qty, target_length, debug, noise_dir, noise_vol, noise_percent):
 
@@ -101,15 +102,15 @@ def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_w
     array_out1 = tfm1.build_array(input_filepath=wav, sample_rate_in=sample_rate)
     #print(len(array_out1) / 16000)
     tfm1.clear_effects()
-    tfm1.norm(-0.1)
     tfm1.fade(fade_in_len=0.02, fade_out_len=0.02)
     if len(array_out1) <= target_samples:
       target_pad = ((target_samples - len(array_out1)) / 2) / sample_rate
       tfm1.pad(start_duration = target_pad, end_duration = target_length + 0.1)
     tfm1.trim(0, target_length)
+    tfm1.norm(-0.1)
     if random.random() < noise_percent:    
       out = os.path.splitext(wav)[0] + '-cbn-' + str(version) + str_effect + '.wav'
-      out = dest_dir + "/" + os.path.basename(out)
+      out = dest_dir + "/" + shortuuid.uuid() + '_' + os.path.basename(out)
       tfm1.build_file(input_array=array_out1, sample_rate_in=sample_rate, output_filepath='/tmp/sample.wav')
       noise_length = sox.file_info.duration(noise_wav)
       if noise_length > target_length:
@@ -118,16 +119,16 @@ def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_w
         print("Noise file to short for target length")
       tfm2 = sox.Transformer()
       tfm2.clear_effects()
-      tfm2.norm(-0.1)
       tfm2.trim(offset, target_length + offset)
       tfm2.fade(fade_in_len=0.02, fade_out_len=0.02)
+      tfm2.norm(-0.1)
       tfm2.build_file(noise_wav, '/tmp/noise.wav')
       noise_lvl = noise_vol * random.random()
       cbn = sox.Combiner()
       cbn.build(['/tmp/sample.wav', '/tmp/noise.wav'], out, 'mix', [1.0, noise_lvl])
     else:
       out = os.path.splitext(wav)[0] + '-bld-' + str(version) + str_effect + '.wav'
-      out = dest_dir + "/" + os.path.basename(out)
+      out = dest_dir + "/" + shortuuid.uuid() + '_' + os.path.basename(out)
       tfm1.build_file(input_array=array_out1, sample_rate_in=sample_rate, output_filepath=out)
     print(out)
     

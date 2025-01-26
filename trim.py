@@ -46,10 +46,8 @@ def trim(source_dir='./in', dest_dir='./out', target_length=1.0, min_pass_len=0.
         continue
       if len(array_out) <= sample_rate * target_length:
         print(sample_rate * min_pass_len)
-        tfm.build_file(input_array=array_out, sample_rate_in=sample_rate, output_filepath=dest_dir + '/' + os.path.basename(wav)
- + '.wav')
-        print(dest_dir + '/' + os.path.basename(wav)
- + '.wav  Sucess! length = ' + str(len(array_out) / sample_rate) + 's')
+        tfm.build_file(input_array=array_out, sample_rate_in=sample_rate, output_filepath=dest_dir + '/' + os.path.basename(wav))
+        print(dest_dir + '/' + os.path.basename(wav) + ' Sucess! length = ' + str(len(array_out) / sample_rate) + 's')
         count += 1
         t = tries
         continue
