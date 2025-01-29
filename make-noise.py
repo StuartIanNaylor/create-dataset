@@ -12,7 +12,7 @@ import configparser as CP
 import math
 import shortuuid
 
-def augment(source_dir, dest_dir, target_qty, target_length, debug, noise_dir, noise_vol, noise_percent):
+def augment(source_dir, dest_dir, target_qty, target_length, debug, noise_dir, noise_vol, silent_percent, silent_vol):
 
   if not os.path.exists(source_dir):
     print("Source_dir = " + source_dir + " does not exist!")
@@ -44,13 +44,13 @@ def augment(source_dir, dest_dir, target_qty, target_length, debug, noise_dir, n
   for noise_wav in noise_samples:
     while qty < sample_qty:
       if os.path.splitext(noise_wav)[1] == ".wav":
-        augment_wav(noise_wav, dest_dir, cfg, sample_rate, target_length, qty + 1, noise_wav, noise_vol, noise_percent)
+        augment_wav(noise_wav, dest_dir, cfg, sample_rate, target_length, qty + 1, noise_wav, noise_vol, silent_percent, silent_vol)
         qty += 1
       else:
         print(noise_wav + ' is not a .wav')
     qty = 0
 
-def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_wav, noise_vol, noise_percent):
+def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_wav, noise_vol, silent_percent, silent_vol):
 
     target_samples = int(sample_rate * target_length)
     noise_length = sox.file_info.duration(noise_wav)
@@ -63,6 +63,12 @@ def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_w
     tfm2.trim(offset, target_length + offset)
     tfm2.fade(fade_in_len=0.02, fade_out_len=0.02)
     tfm2.norm(-0.1)
+    print(random.random())
+    if silent_percent > random.random():
+      tfm2.vol(silent_vol * random.random())
+      print(silent_percent)
+    else:
+      tfm2.vol(1.0 - ((1.0 - noise_vol)  * random.random()))
     out = os.path.splitext(noise_wav)[0] + '-bld-' + str(version) + '.wav'
     out = dest_dir + "/" + shortuuid.uuid() + "-" + os.path.basename(out)
     tfm2.build_file(noise_wav, out)
@@ -76,11 +82,12 @@ def main_body():
   parser.add_argument('--target_length', type=float, default=1.0, help='Target length of audio files to be trimmed to (s)')
   parser.add_argument('--debug', help='debug effect settings to cli', action="store_true")
   parser.add_argument('--noise_dir', default='./noise', help='noise dir location')
-  parser.add_argument('--noise_vol', type=float, default=0.3, help='Max Vol of noise background mix (0.3)')
-  parser.add_argument('--noise_percent', type=float, default=0.9, help='Percent of KW to add noise to (0.9)')
+  parser.add_argument('--noise_vol', type=float, default=0.9, help='Max Vol of noise foreground (0.9)')
+  parser.add_argument('--silent_percent', type=float, default=0.1, help='Percent silent noise to (0.1)')
+  parser.add_argument('--silent_vol', type=float, default=0.3, help='Silent noise vol (0.3)')
   args = parser.parse_args()
   
-  augment(args.source_dir, args.dest_dir, args.target_qty, args.target_length, args.debug, args.noise_dir, args.noise_vol, args.noise_percent)
+  augment(args.source_dir, args.dest_dir, args.target_qty, args.target_length, args.debug, args.noise_dir, args.noise_vol, args.silent_percent, args.silent_vol)
     
 if __name__ == '__main__':
   main_body()

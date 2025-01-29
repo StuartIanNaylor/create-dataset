@@ -12,7 +12,7 @@ import configparser as CP
 import math
 import shortuuid
 
-def augment(source_dir, dest_dir, target_qty, target_length, debug, noise_dir, noise_vol, noise_percent):
+def augment(source_dir, dest_dir, target_qty, target_length, debug, noise_dir, noise_vol, noise_percent, min_vol, jitter):
 
   if not os.path.exists(source_dir):
     print("Source_dir = " + source_dir + " does not exist!")
@@ -52,12 +52,12 @@ def augment(source_dir, dest_dir, target_qty, target_length, debug, noise_dir, n
     while qty < sample_qty:
       if os.path.splitext(target_wav)[1] == ".wav":
         noise_wav = noise_samples[int(noise_qty * random.random())]
-        augment_wav(target_wav, dest_dir, cfg, sample_rate, target_length, qty + 1, noise_wav, noise_vol, noise_percent)
+        augment_wav(target_wav, dest_dir, cfg, sample_rate, target_length, qty + 1, noise_wav, noise_vol, noise_percent, min_vol, jitter)
         qty += 1
       else:
         print(target_wav + ' is not a .wav')
 
-def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_wav, noise_vol, noise_percent):
+def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_wav, noise_vol, noise_percent, min_vol, jitter):
 
     rand_effect = random.random()
     #wav_length = sox.file_info.duration(wav)
@@ -100,18 +100,24 @@ def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_w
       str_effect = str_effect + "-b"
            
     array_out1 = tfm1.build_array(input_filepath=wav, sample_rate_in=sample_rate)
-    #print(len(array_out1) / 16000)
     tfm1.clear_effects()
     tfm1.fade(fade_in_len=0.02, fade_out_len=0.02)
+    jitter_length = jitter * random.random()
     if len(array_out1) <= target_samples:
       target_pad = ((target_samples - len(array_out1)) / 2) / sample_rate
+      if jitter_length > jitter / 2:
+        target_pad = target_pad + (jitter_length /2)
+      else:
+        target_pad = target_pad - (jitter_length /2)
+      if target_pad < 0:
+        target_pad = 0
       tfm1.pad(start_duration = target_pad, end_duration = target_length + 0.1)
     tfm1.trim(0, target_length)
     tfm1.norm(-0.1)
+    out = os.path.splitext(wav)[0] + '-cbn-' + str(version) + str_effect + '.wav'
+    out = dest_dir + "/" + shortuuid.uuid() + '_' + os.path.basename(out)
+    tfm1.build_file(input_array=array_out1, sample_rate_in=sample_rate, output_filepath='/tmp/sample.wav')
     if random.random() < noise_percent:    
-      out = os.path.splitext(wav)[0] + '-cbn-' + str(version) + str_effect + '.wav'
-      out = dest_dir + "/" + shortuuid.uuid() + '_' + os.path.basename(out)
-      tfm1.build_file(input_array=array_out1, sample_rate_in=sample_rate, output_filepath='/tmp/sample.wav')
       noise_length = sox.file_info.duration(noise_wav)
       if noise_length > target_length:
         offset = (noise_length - target_length) * random.random()
@@ -123,13 +129,18 @@ def augment_wav(wav, dest_dir, cfg, sample_rate, target_length, version, noise_w
       tfm2.fade(fade_in_len=0.02, fade_out_len=0.02)
       tfm2.norm(-0.1)
       tfm2.build_file(noise_wav, '/tmp/noise.wav')
+      wav_vol = 1.0 - ((1.0 - min_vol) * random.random())
+      noise_vol = noise_vol * wav_vol
       noise_lvl = noise_vol * random.random()
       cbn = sox.Combiner()
-      cbn.build(['/tmp/sample.wav', '/tmp/noise.wav'], out, 'mix', [1.0, noise_lvl])
+      cbn.build(['/tmp/sample.wav', '/tmp/noise.wav'], out, 'mix', [wav_vol, noise_lvl])
     else:
-      out = os.path.splitext(wav)[0] + '-bld-' + str(version) + str_effect + '.wav'
-      out = dest_dir + "/" + shortuuid.uuid() + '_' + os.path.basename(out)
-      tfm1.build_file(input_array=array_out1, sample_rate_in=sample_rate, output_filepath=out)
+      tfm1.clear_effects()
+      wav_vol = 1.0 - ((1.0 - min_vol) * random.random())
+      tfm1.norm(-0.1)
+      tfm1.vol(wav_vol)
+      tfm1.build('/tmp/sample.wav', output_filepath=out)
+      
     print(out)
     
 def main_body():
@@ -142,9 +153,11 @@ def main_body():
   parser.add_argument('--noise_dir', default='./noise', help='noise dir location')
   parser.add_argument('--noise_vol', type=float, default=0.3, help='Max Vol of noise background mix (0.3)')
   parser.add_argument('--noise_percent', type=float, default=0.9, help='Percent of KW to add noise to (0.9)')
+  parser.add_argument('--min_vol', type=float, default=0.9, help='Min Vol of foreground (0.9)')
+  parser.add_argument('--jitter', type=float, default=0.02, help='Foreground time jitter (0.02)')
   args = parser.parse_args()
   
-  augment(args.source_dir, args.dest_dir, args.target_qty, args.target_length, args.debug, args.noise_dir, args.noise_vol, args.noise_percent)
+  augment(args.source_dir, args.dest_dir, args.target_qty, args.target_length, args.debug, args.noise_dir, args.noise_vol, args.noise_percent, args.min_vol, args.jitter)
     
 if __name__ == '__main__':
   main_body()
